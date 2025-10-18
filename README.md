@@ -170,3 +170,7 @@ The user uploaded a file called `History_of_Neural_Nets_Summary.docx` and asked 
 
 > The review functionality conserves the original formatting of the document while adding comments to specified elements.
 
+
+## Star History
+
+[![Star History Chart](https://api.star-history.com/svg?repos=Baronco/GenFilesMCP&type=date&legend=top-left)](https://www.star-history.com/#Baronco/GenFilesMCP&type=date&legend=top-left)
