@@ -19,6 +19,7 @@ COPY uv.lock ./
 # Copy template directorie into the container
 COPY template/ ./template/
 COPY temp/ ./temp/
+COPY utils/ ./utils/
 
 # Install dependencies using UV, leveraging cache for faster builds
 RUN --mount=type=cache,target=/root/.cache/uv \

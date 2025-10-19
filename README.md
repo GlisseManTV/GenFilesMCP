@@ -37,9 +37,11 @@ docker run -d --restart unless-stopped -p YOUR_PORT:YOUR_PORT -e OWUI_URL="http:
 Note:
 - OWUI_URL => The local URL of your Open Web UI instance (e.g. http://host.docker.internal:3000)
 
-## 🔌 MCP configuration (MCPO)
+## 🔌 MCP configuration
 
-Your MCPO (MCP orchestration) config must include an entry for this MCP, for example:
+**Note:** From Open Web UI version v0.6.31 onwards, it is compatible with `http streamable` type MCPs, so installing MCPO (MCP orchestration) is not necessary. You can configure the MCP directly in Open Web UI.
+
+If you are using an earlier version or prefer to use MCPO, your MCPO config must include an entry for this MCP, for example:
 
 ```json
 {
