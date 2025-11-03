@@ -16,7 +16,7 @@ GenFilesMCP is a Model Context Protocol (MCP) server that generates PowerPoint, 
   - [MCP Configuration in Open Web UI](#mcp-configuration-in-open-web-ui)
 - [Setup for Document Generation and Review Features](#setup-for-document-generation-and-review-features)
   - [Knowledge Base and Permissions](#knowledge-base-and-permissions)
-  - [🚨 MCP Server Document Upload Settings](#🚨-mcp-server-document-upload-settings)
+  - [MCP Server Document Upload Settings](#mcp-server-document-upload-settings)
 - [Usage Examples](#usage-examples)
   - [Example 1: Generating a DOCX file](#example-1-generating-a-docx-file)
   - [Example 2: Reviewing a DOCX file with comments](#example-2-reviewing-a-docx-file-with-comments)
@@ -208,7 +208,7 @@ This version integrates with Open Web UI's knowledge base system:
 
 </div>
 
-### 🚨 MCP Server Document Upload Settings
+### MCP Server Document Upload Settings
 
 To ensure that the upload of documents generated or reviewed by AI via the MCP server works for users or administrators, the `'Bypass Embedding and Retrieval'` option must be `enabled` in the Document options. Currently, I don't find an explanation of why, but to manage the knowledge of generated documents, it must be done.
 
