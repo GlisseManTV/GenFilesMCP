@@ -14,7 +14,7 @@ def download_file(url: str, token: str, file_id: str) -> BytesIO:
 
     # Prepare headers and files for the request
     headers = {
-        'Authorization': f'Bearer {token}',
+        'Authorization': token,
         'Accept': 'application/json'
     }
     # Send the GET request

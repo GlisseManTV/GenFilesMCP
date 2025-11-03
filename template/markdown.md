@@ -3,27 +3,24 @@ Generate a Markdown document using a Python script. Returns a markdown hyperlink
 Template structure:
 ```python
 # Allowed packages
-import numpy as np
-import os
-import pypandoc
+# Note: For simple Markdown, no additional packages are needed. pypandoc is optional for advanced formatting.
 
-# Import here other md packages you need, but do not import other packages that are not allowed.
-
-# Path to save the Markdown file, previously defined in the server.py file
-MD_PATH = md_path # Do not modify this line, it is defined in the server.py file
+# Buffer to save the Markdown file, previously defined in the server.py file
+# IMPORTANT: MD_BUFFER is a BytesIO buffer (in-memory file-like object), not a file path.
+# Writing to it saves in RAM, not on disk. Always encode text to bytes with .encode('utf-8').
+MD_BUFFER = md_buffer # Do not modify this line, it is defined in the server.py file
 
 def markdown():
-    # Build a Markdown document according to the user's request.
-    markdown_content = "# Your Markdown Content Here"
+    # Step 1: Build a Markdown document according to the user's request.
+    # Use triple quotes for multi-line strings to avoid syntax errors.
+    markdown_content = """# Example Markdown Document here"""
 
-    # Save the markdown
-    pypandoc.convert_text(markdown_content, 'md', format='md', outputfile=MD_PATH, extra_args=['--standalone']) # Do not modify this line, it is defined in the server.py file
+    # Step 2: Save the content to the buffer (recommended method for simple Markdown)
+    # This writes directly to memory (RAM), no disk involved.
+    MD_BUFFER.write(markdown_content.encode('utf-8'))
 
-    # Check if the file was created successfully
-    if not os.path.exists(MD_PATH):
-        raise ValueError(f"Failed to create the Markdown file.")
-    else:
-        return f"Markdown file created successfully!"
+
+    return "Markdown file created successfully!"
 
 # Invoke the function to generate the markdown document
 markdown()

@@ -1,30 +1,36 @@
 # Native libraries
 from json import dumps
-from os import getenv, makedirs
-from os.path import exists
-from shutil import rmtree
+from os import getenv
 from typing import Annotated, Literal, List, Tuple
 from enum import Enum
-from uuid import uuid4
 from pathlib import Path
 from io import BytesIO
+import logging
+logging.basicConfig(level=logging.INFO, force=True)
+logger = logging.getLogger("GenFilesMCP")
 
 # Third-party libraries
-from pydantic import Field
+from pydantic import Field, BaseModel
 from requests import post, get
-from mcp.server.fastmcp import FastMCP
+from mcp.server.fastmcp import FastMCP, Context
+from mcp.server.session import ServerSession
 from docx import Document
 
 # Utilities
 from utils.load_md_templates import load_md_templates
 from utils.upload_file import upload_file
 from utils.download_file import download_file
+from utils.knowledge import create_knowledge, add_file_to_knowledge
 
 # Parameters
 URL = getenv('OWUI_URL',)
-TOKEN = getenv('JWT_SECRET')
 PORT = int(getenv('PORT'))
 POWERPOINT_TEMPLATE, EXCEL_TEMPLATE, WORD_TEMPLATE,MARKDOWN_TEMPLATE, MCP_INSTRUCTIONS = load_md_templates()
+
+# Pydantic model for review comments
+class ReviewComment(BaseModel):
+    index: int
+    comment: str
 
 # Initialize FastMCP server
 mcp = FastMCP(
@@ -39,7 +45,7 @@ mcp = FastMCP(
     title = "Generate PowerPoint presentation",
     description = POWERPOINT_TEMPLATE
 )
-def generate_powerpoint(
+async def generate_powerpoint(
     python_script: Annotated[
         str, 
         Field(description="Complete Python script that generates the PowerPoint presentation using the provided template.")
@@ -47,7 +53,12 @@ def generate_powerpoint(
     file_name: Annotated[
         str, 
         Field(description="Desired name for the generated PowerPoint file without the extension.")
-    ]
+    ],
+    user_id: Annotated[
+        str,
+        Field(description="User ID to associate the knowledge base with the correct user.")
+    ],
+    ctx: Context[ServerSession, None]
 ) -> dict:
     """
     Generate a PowerPoint file using a Python script.
@@ -56,28 +67,48 @@ def generate_powerpoint(
         dict: Contains 'file_path_download' with a markdown hyperlink for downloading the generated PowerPoint file.
               Format: "[Download {filename}.pptx](/api/v1/files/{id}/content)"
     """
-    # user folder
-    if not exists('/app/temp'):
-        makedirs('/app/temp')
     try:
-        # Generate a unique filename for the PowerPoint file
-        file_path = f'/app/temp/{file_name}_{uuid4()}.pptx'
-        context = {"pptx_path": file_path}
-        exec(python_script, context )
+        # Create a buffer for the PowerPoint file
+        buffer = BytesIO()
+        buffer.name = f'{file_name}.pptx'
+        context = {"pptx_buffer": buffer}
+        exec(python_script, context)
+
+        # Reset buffer position to start
+        buffer.seek(0)
+
+        # Retrieve authorization header from the request context
+        try:
+            bearer_token = ctx.request_context.request.headers.get("authorization")
+            logger.info(f"Recieved authorization header!")
+        except:
+            logger.error(f"Error retrieving authorization header")
 
         # Upload the generated PowerPoint file
-        response = upload_file(
+        response, request_data = upload_file(
             url=URL, 
-            token=TOKEN, 
-            file_path=file_path,
+            token=bearer_token, 
+            file_data=buffer,
             filename=file_name,
             file_type="pptx"
         )
-        # Response format: {"file_path_download": "[Download presentation.pptx](/api/v1/files/123/content)"}
 
-        # remove the temporary file after upload
-        rmtree('/app/temp', ignore_errors=True)
-        
+        # If upload is successful, add to knowledge base
+        if "file_path_download" in response:
+            # create knowledge base if not exists
+            create_knowledge_status = create_knowledge(
+                url=URL, 
+                token=bearer_token,
+                file_id=request_data['id'],
+                user_id=user_id
+            )
+            if create_knowledge_status:
+                logger.info("Knowledge base updated successfully.")
+            else:
+                logger.error(f"Error creating or updating knowledge base")
+        else:
+            logger.error(f"Error uploading file to knowledge base")
+
         return response 
     
     except Exception as e:
@@ -96,7 +127,7 @@ def generate_powerpoint(
     title = "Generate Excel workbook",
     description = EXCEL_TEMPLATE
 )
-def generate_excel(
+async def generate_excel(
     python_script: Annotated[
         str, 
         Field(description="Complete Python script that generates the Excel workbook using the provided template.")
@@ -104,7 +135,12 @@ def generate_excel(
     file_name: Annotated[
         str, 
         Field(description="Desired name for the generated Excel file without the extension.")
-    ]
+    ],
+    user_id: Annotated[
+        str,
+        Field(description="User ID to associate the knowledge base with the correct user.")
+    ],
+    ctx: Context[ServerSession, None]
 ) -> dict:
     """
     Generate an Excel file using a Python script.
@@ -113,28 +149,48 @@ def generate_excel(
         dict: Contains 'file_path_download' with a markdown hyperlink for downloading the generated Excel file.
               Format: "[Download {filename}.xlsx](/api/v1/files/{id}/content)"
     """
-    # user folder
-    if not exists('/app/temp'):
-        makedirs('/app/temp')
     try:
-        # Generate a unique filename for the Excel file
-        file_path = f'/app/temp/{file_name}_{uuid4()}.xlsx'
-        context = {"xlsx_path": file_path}
-        exec(python_script, context )
+        # Create a buffer for the Excel file
+        buffer = BytesIO()
+        buffer.name = f'{file_name}.xlsx'
+        context = {"xlsx_buffer": buffer}
+        exec(python_script, context)
+
+        # Reset buffer position to start
+        buffer.seek(0)
+
+        # Retrieve authorization header from the request context
+        try:
+            bearer_token = ctx.request_context.request.headers.get("authorization")
+            logger.info(f"Recieved authorization header!")
+        except:
+            logger.error(f"Error retrieving authorization header")
 
         # Upload the generated Excel file
-        response = upload_file(
+        response, request_data = upload_file(
             url=URL, 
-            token=TOKEN, 
-            file_path=file_path,
+            token=bearer_token, 
+            file_data=buffer,
             filename=file_name,
             file_type="xlsx"
         )
-        # Response format: {"file_path_download": "[Download workbook.xlsx](/api/v1/files/123/content)"}
 
-        # remove the temporary file after upload
-        rmtree('/app/temp', ignore_errors=True)
-        
+        # If upload is successful, add to knowledge base
+        if "file_path_download" in response:
+            # create knowledge base if not exists
+            create_knowledge_status = create_knowledge(
+                url=URL, 
+                token=bearer_token,
+                file_id=request_data['id'],
+                user_id=user_id
+            )
+            if create_knowledge_status:
+                logger.info("Knowledge base updated successfully.")
+            else:
+                logger.error(f"Error creating or updating knowledge base")
+        else:
+            logger.error(f"Error uploading file to knowledge base")
+
         return response 
     
     except Exception as e:
@@ -153,7 +209,7 @@ def generate_excel(
     title = "Generate Word document",
     description = WORD_TEMPLATE
 )
-def generate_word(
+async def generate_word(
     python_script: Annotated[
         str, 
         Field(description="Complete Python script that generates the Word document using the provided template.")
@@ -161,7 +217,12 @@ def generate_word(
     file_name: Annotated[
         str, 
         Field(description="Desired name for the generated Word file without the extension.")
-    ]
+    ],
+    user_id: Annotated[
+        str,
+        Field(description="User ID to associate the knowledge base with the correct user.")
+    ],
+    ctx: Context[ServerSession, None]
 ) -> dict:
     """
     Generate a Word file using a Python script.
@@ -170,28 +231,48 @@ def generate_word(
         dict: Contains 'file_path_download' with a markdown hyperlink for downloading the generated Word file.
               Format: "[Download {filename}.docx](/api/v1/files/{id}/content)"
     """
-    # user folder
-    if not exists('/app/temp'):
-        makedirs('/app/temp')
     try:
-        # Generate a unique filename for the Word file
-        file_path = f'/app/temp/{file_name}_{uuid4()}.docx'
-        context = {"docx_path": file_path}
-        exec(python_script, context )
+        # Create a buffer for the Word file
+        buffer = BytesIO()
+        buffer.name = f'{file_name}.docx'
+        context = {"docx_buffer": buffer}
+        exec(python_script, context)
+
+        # Reset buffer position to start
+        buffer.seek(0)
+
+        # Retrieve authorization header from the request context
+        try:
+            bearer_token = ctx.request_context.request.headers.get("authorization")
+            logger.info(f"Recieved authorization header!")
+        except:
+            logger.error(f"Error retrieving authorization header")
 
         # Upload the generated Word file
-        response = upload_file(
+        response, request_data = upload_file(
             url=URL, 
-            token=TOKEN, 
-            file_path=file_path,
+            token=bearer_token, 
+            file_data=buffer,
             filename=file_name,
             file_type="docx"
         )
-        # Response format: {"file_path_download": "[Download document.docx](/api/v1/files/123/content)"}
 
-        # remove the temporary file after upload
-        rmtree('/app/temp', ignore_errors=True)
-        
+        # If upload is successful, add to knowledge base
+        if "file_path_download" in response:
+            # create knowledge base if not exists
+            create_knowledge_status = create_knowledge(
+                url=URL, 
+                token=bearer_token,
+                file_id=request_data['id'],
+                user_id=user_id
+            )
+            if create_knowledge_status:
+                logger.info("Knowledge base updated successfully.")
+            else:
+                logger.error(f"Error creating or updating knowledge base")
+        else:
+            logger.error(f"Error uploading file to knowledge base")
+
         return response 
     
     except Exception as e:
@@ -210,7 +291,7 @@ def generate_word(
     title = "Generate Markdown document",
     description = MARKDOWN_TEMPLATE
 ) 
-def generate_markdown(
+async def generate_markdown(
     python_script: Annotated[
         str, 
         Field(description="Complete Python script that generates the Markdown document using the provided template.")
@@ -218,7 +299,12 @@ def generate_markdown(
     file_name: Annotated[
         str, 
         Field(description="Desired name for the generated Markdown file without the extension.")
-    ]
+    ],
+    user_id: Annotated[
+        str,
+        Field(description="User ID to associate the knowledge base with the correct user.")
+    ],
+    ctx: Context[ServerSession, None]
 ) -> dict:
     """
     Generate a Markdown file using a Python script.
@@ -227,28 +313,48 @@ def generate_markdown(
         dict: Contains 'file_path_download' with a markdown hyperlink for downloading the generated Markdown file.
               Format: "[Download {filename}.md](/api/v1/files/{id}/content)"
     """
-    # user folder
-    if not exists('/app/temp'):
-        makedirs('/app/temp')
     try:
-        # Generate a unique filename for the Markdown file
-        file_path = f'/app/temp/{file_name}_{uuid4()}.md'
-        context = {"md_path": file_path}
-        exec(python_script, context )
+        # Create a buffer for the Markdown file
+        buffer = BytesIO()
+        buffer.name = f'{file_name}.md'
+        context = {"md_buffer": buffer}
+        exec(python_script, context)
+
+        # Reset buffer position to start
+        buffer.seek(0)
+
+        # Retrieve authorization header from the request context
+        try:
+            bearer_token = ctx.request_context.request.headers.get("authorization")
+            logger.info(f"Recieved authorization header!")
+        except:
+            logger.error(f"Error retrieving authorization header")
 
         # Upload the generated Markdown file
-        response = upload_file(
+        response, request_data = upload_file(
             url=URL, 
-            token=TOKEN, 
-            file_path=file_path,
+            token=bearer_token, 
+            file_data=buffer,
             filename=file_name,
             file_type="md"
         )
-        # Response format: {"file_path_download": "[Download document.md](/api/v1/files/123/content)"}
 
-        # remove the temporary file after upload
-        rmtree('/app/temp', ignore_errors=True)
-        
+        # If upload is successful, add to knowledge base
+        if "file_path_download" in response:
+            # create knowledge base if not exists
+            create_knowledge_status = create_knowledge(
+                url=URL, 
+                token=bearer_token,
+                file_id=request_data['id'],
+                user_id=user_id
+            )
+            if create_knowledge_status:
+                logger.info("Knowledge base updated successfully.")
+            else:
+                logger.error(f"Error creating or updating knowledge base")
+        else:
+            logger.error(f"Error uploading file to knowledge base")
+
         return response 
     
     except Exception as e:
@@ -268,7 +374,7 @@ def generate_markdown(
     description="""Return the index, style and text of each element in a docx document. This includes paragraphs, headings, tables, images, and other components. The output is a JSON object that provides a detailed representation of the document's structure and content.
     The Agent will use this tool to understand the content and structure of the document before perform corrections (spelling, grammar, style suggestions, idea enhancements). Agent have to identify the index of each element to be able to add comments in the review_docx tool."""
 )
-def full_context_docx(
+async def full_context_docx(
     file_id: Annotated[
         str, 
         Field(description="ID of the existing docx file to analyze (from a previous chat upload).")
@@ -276,18 +382,26 @@ def full_context_docx(
     file_name: Annotated[
         str, 
         Field(description="The name of the original docx file")
-    ]
+    ],
+    ctx: Context[ServerSession, None]
 ) -> dict:
     """
     Return the structure of a docx document including index, style, and text of each element.
     Returns:
         dict: A JSON object with the structure of the document.
     """
+    # Retrieve authorization header from the request context
+    try:
+        bearer_token = ctx.request_context.request.headers.get("authorization")
+        logger.info(f"Recieved authorization header!")
+    except:
+        logger.error(f"Error retrieving authorization header")
+
     try:
         # Download in memory the docx file using the download_file helper
         docx_file = download_file(
             url=URL, 
-            token=TOKEN, 
+            token=bearer_token, 
             file_id=file_id
         )
 
@@ -348,7 +462,7 @@ def full_context_docx(
     title="Review and comment on docx document",
     description="""Review an existing docx document, perform corrections (spelling, grammar, style suggestions, idea enhancements), and add comments to cells. Returns a markdown hyperlink for downloading the reviewed file."""
 )
-def review_docx(
+async def review_docx(
     file_id: Annotated[
         str, 
         Field(description="ID of the existing docx file to review (from a previous chat upload).")
@@ -358,23 +472,32 @@ def review_docx(
         Field(description="The name of the original docx file")
     ],
     review_comments: Annotated[
-        List[Tuple[int, str]], 
-        Field(description="List of tuples where each tuple contains: (index: int - the index of the docx document element to comment on, comment: str - the review comment, idea enhancements, suggestions or correction text).")
-    ]
+        List[ReviewComment], 
+        Field(description="List of objects where each object has keys: 'index' (int) and 'comment' (str). Example: [{'index': 0, 'comment': 'Fix typo'}].")
+    ],
+    user_id: Annotated[
+        str,
+        Field(description="User ID to associate the knowledge base with the correct user.")
+    ],
+    ctx: Context[ServerSession, None]
 ) -> dict:
     """
     Review an existing docx document and add comments to specified elements.
     Returns:
         dict: Contains 'file_path_download' with a markdown hyperlink for downloading the reviewed docx file.
-              Format: "[Download {filename}.md](/api/v1/files/{id}/content)"
+              Format: "[Download {filename}.docx](/api/v1/files/{id}/content)"
     """
-    # user folder
-    if not exists('/app/temp'):
-        makedirs('/app/temp')
+    # Retrieve authorization header from the request context
+    try:
+        bearer_token = ctx.request_context.request.headers.get("authorization")
+        logger.info(f"Recieved authorization header!")
+    except:
+        logger.error(f"Error retrieving authorization header")
+
     try:
         
         # Download the existing docx file
-        docx_file = download_file(URL, TOKEN, file_id)
+        docx_file = download_file(URL, bearer_token, file_id)
         if isinstance(docx_file, dict) and "error" in docx_file:
             return dumps(docx_file, indent=4, ensure_ascii=False)
 
@@ -383,7 +506,17 @@ def review_docx(
 
         # Add comments to specified paragraphs
         paragraphs = list(doc.paragraphs)  # Get list of paragraphs
-        for index, comment_text in review_comments:
+        for item in review_comments:
+            try:
+                index = item.index
+                comment_text = item.comment
+            except (AttributeError, TypeError):
+                # malformed item; skip
+                continue
+
+            if index is None or comment_text is None:
+                continue
+
             if 0 <= index < len(paragraphs):
                 para = paragraphs[index]
                 if para.runs:  # Ensure there are runs to comment on
@@ -395,21 +528,37 @@ def review_docx(
                         initials="AI"
                     )
 
-        # Save the reviewed file
-        reviewed_path = f'/app/temp/{Path(file_name).stem}_reviewed_{uuid4()}.docx'
-        doc.save(reviewed_path)
+        # Create a buffer for the reviewed file
+        buffer = BytesIO()
+        buffer.name = f'{Path(file_name).stem}_reviewed.docx'
+        doc.save(buffer)
+        buffer.seek(0)
 
         # Upload the reviewed docx file
-        response = upload_file(
+        response, request_data = upload_file(
             url=URL, 
-            token=TOKEN, 
-            file_path=reviewed_path,
+            token=bearer_token, 
+            file_data=buffer,
             filename=f"{Path(file_name).stem}_reviewed",
             file_type="docx"
         )
 
-        # Remove temp file
-        rmtree('/app/temp', ignore_errors=True)
+        # If upload is successful, add to knowledge base
+        if "file_path_download" in response:
+            # create knowledge base if not exists
+            create_knowledge_status = create_knowledge(
+                url=URL, 
+                token=bearer_token,
+                file_id=request_data['id'],
+                user_id=user_id,
+                knowledge_name="Documents Reviewed by AI"
+            )
+            if create_knowledge_status:
+                logger.info("Knowledge base updated successfully.")
+            else:
+                logger.error(f"Error creating or updating knowledge base")
+        else:
+            logger.error(f"Error uploading file to knowledge base")
 
         return response
     

@@ -1,5 +1,3 @@
-# MCP Instructions:
-
 Generates PowerPoint, Excel, Word or Markdown files from user requests. Each tool returns a markdown hyperlink for downloading the generated file. 
 
 Use the specific tools for each file type: `generate_powerpoint`, `generate_excel`, `generate_word`, or `generate_markdown`. 
