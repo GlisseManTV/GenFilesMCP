@@ -16,6 +16,16 @@ def upload_file(url: str, token: str, file_data: BytesIO, filename:str, file_typ
               Format: "[Download {filename}.{file_type}](/api/v1/files/{id}/content)"
               On error: {"error": {"message": "error description"}}
     """
+    # MIME type mapping
+    mime_types = {
+        'pptx': 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+        'xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        'md': 'text/markdown'
+    }
+    
+    mime_type = mime_types.get(file_type, 'application/octet-stream')
+    
     # Ensure the URL ends with '/api/v1/files/'
     url = f'{url}/api/v1/files/'
 
@@ -24,9 +34,9 @@ def upload_file(url: str, token: str, file_data: BytesIO, filename:str, file_typ
         'Authorization': token,
         'Accept': 'application/json'
     }
-
+ 
     # Handle file_like: assume it's a file-like object (e.g., BytesIO) with .name attribute set
-    files = {'file': file_data}
+    files = {'file': (f"{filename}.{file_type}", file_data, mime_type)}
 
     response = post(url, headers=headers, files=files)
 
