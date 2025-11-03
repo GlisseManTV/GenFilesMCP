@@ -143,42 +143,28 @@ class Tools:
 
     # Add your custom tools using pure Python code here, make sure to add type hints and descriptions
 
-    def chat_files(self, __files__: dict = {}) -> dict:
+    def chat_context(self, __files__: dict = {}, __user__: dict = {}) -> dict:
         """
-        Get files metadata
+        Get files metadata and get the user Email and user ID from the user object.
         """
         # id and name of current files
-        chat_current_files = {"files": []}
+        chat_context = {"files": [], "user_id": None, "user_email": None}
 
-        if __files__ is not None:
-            for f in __files__:
-                chat_current_files["files"].append({"id": f["id"], "name": f["name"]})
-            return chat_current_files
-        else:
-            message = {
-                "message": "There are no documents uploaded in the current chat."
-            }
-            return message
-
-    def user_data(self, __user__: dict = {}) -> str:
-        """
-        Get the user Email and user ID from the user object.
-        """
-
-        # Do not include a descrption for __user__ as it should not be shown in the tool's specification
-        # The session user object will be passed as a parameter when the function is called
-
-        user_data = {"user_id": None, "user_email": None}
-
+        # user data
         if "id" in __user__:
-            user_data["user_id"] = __user__["id"]
+            chat_context["user_id"] = __user__["id"]
         if "email" in __user__:
-            user_data["user_email"] = __user__["email"]
+            chat_context["user_email"] = __user__["email"]
+        if chat_context["user_id"] is None:
+            chat_context = {"error": "User: Unknown"}
 
-        if user_data["user_id"] is None:
-            user_data = {"error": "User: Unknown"}
-
-        return user_data
+        # files metadata
+        if __files__:
+            for f in __files__:
+                chat_context["files"].append({"id": f["id"], "name": f["name"]})
+            return chat_context
+        else:
+            return chat_context
 ```
 
 3. Save the tool as `chat_context`
