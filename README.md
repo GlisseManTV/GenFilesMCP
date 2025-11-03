@@ -109,7 +109,13 @@ The MCP server requires the following environment variables:
 
 Configure the MCP directly in your Open Web UI "External Tools" settings. Set the type to "MCP Streamable HTTP".
 
+<div style="text-align: center;">
 
+  ![MCP Configuration](img/mcp.png)
+
+</div>
+
+> Once Tools are enabled for your model, Open WebUI gives you two different ways to let your LLM use them in conversations. You can decide how the model should call Tools by choosing between: `Default Mode (Prompt-based)` or `Native Mode (Built-in function calling)`, check the documentation for more details: [OWUI Tools](https://docs.openwebui.com/features/plugin/tools/)
 
 ## Setup for Document Generation and Review Features
 
